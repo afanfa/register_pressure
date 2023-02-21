@@ -69,4 +69,9 @@ If your application makes use of memory allocated on the stack, seeing scratch m
 4. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inline device functions, including math function and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
 As an example, replacing _pow(var,2.0)_ with a simple _var*var_ can significantly reduce register pressure.
 
-5. **Keep loop unrolling under control**. 
+5. **Keep loop unrolling under control**. Loop unrolling can be obtained by adding a _#pragma unroll_ command on a loop where the number of iterations is known at compile time. By doing so, all the iterations are completely unrolled, thus reducing the cost of checking the exit condition for the loop.
+On the other hand, unrolling increases the register pressure because more variables need to be store in registers at the same time. In cases where register pressure is a concern, the use of loop unrolling should be limited.
+
+6. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few register per thread.
+
+## Examples
