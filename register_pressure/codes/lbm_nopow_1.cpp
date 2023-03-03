@@ -1,26 +1,27 @@
 #include "hip/hip_runtime.h"
 
-__global__ __launch_bounds__(256,1) void kernel (double * __restrict__ phi, double * __restrict__ laplacian_phi,
-						 double * __restrict__ grad_phi_x, double * __restrict__ grad_phi_y, double * __restrict__ grad_phi_z,
-						 double * __restrict__ f0, double * __restrict__ f1, double * __restrict__ f2, double * __restrict__ f3, double * __restrict__ f4,
-						 double * __restrict__ f5, double * __restrict__ f6,
-						 double * __restrict__ g0, double * __restrict__ g1, double * __restrict__ g2, double * __restrict__ g3, double * __restrict__ g4,
-						 double * __restrict__ g5, double * __restrict__ g6, double* __restrict__ g7, double * __restrict__ g8, double * __restrict__ g9,
-						 double * __restrict__ g10, double * __restrict__ g11, double * __restrict__ g12, double * __restrict__ g13, double * __restrict__ g14,
-						 double * __restrict__ g15, double * __restrict__ g16, double * __restrict__ g17, double * __restrict__ g18,
-						 int nx, int ny, int nz, int ldx, int ldy, int current, int next,
-						 double k, double alpha, double phi2, double gamma,
-						 double itauphi, double itauphi1, double ieta,
-						 double itaurho, double grav,
-						 double eg1, double eg2, double eg0, double egc0, double egc1, double egc2)
+__global__ void kernel (double *phi, double *laplacian_phi,
+			double *grad_phi_x, double *grad_phi_y, double *grad_phi_z,
+			double *f0, double *f1, double *f2, double *f3, double *f4,
+			double *f5, double *f6,
+			double *g0, double *g1, double *g2, double *g3, double *g4,
+			double *g5, double *g6, double* g7, double *g8, double *g9,
+			double *g10, double *g11, double *g12, double *g13, double *g14,
+			double *g15, double *g16, double *g17, double *g18,
+			int nx, int ny, int nz, int ldx, int ldy, int current, int next,
+			double k, double alpha, double phi2, double gamma,
+			double itauphi, double itauphi1, double ieta,
+			double itaurho, double grav,
+			double eg1, double eg2, double eg0, double egc0, double egc1, double egc2)
 {
   int i = (threadIdx.x + blockIdx.x * blockDim.x);
   int j = (threadIdx.y + blockIdx.y * blockDim.y);
   int z = (threadIdx.z + blockIdx.z * blockDim.z);
     
   int m, current_pos;
+
   double mu_phi, current_phi, current_phi_2;
-  double rho, irho;
+  double rho;
   double fx, fy, fz;
   double uf, ux, uy, uz, v;
   double af, ag, cf;
@@ -40,8 +41,6 @@ __global__ __launch_bounds__(256,1) void kernel (double * __restrict__ phi, doub
 	g10[current_pos] + g11[current_pos] + g12[current_pos] + g13[current_pos] + g14[current_pos] +
 	g15[current_pos] + g16[current_pos] + g17[current_pos] + g18[current_pos];
       
-      irho = 1.0/rho;
-      
       mu_phi = alpha * current_phi * ( current_phi_2 - phi2 ) - k * laplacian_phi[m];
 
       fx = mu_phi * grad_phi_x[m];
@@ -50,13 +49,13 @@ __global__ __launch_bounds__(256,1) void kernel (double * __restrict__ phi, doub
 
       ux = ( g1[current_pos] - g2[current_pos] + g7[current_pos] - g8[current_pos] + g9[current_pos] -
 	     g10[current_pos] + g11[current_pos] - g12[current_pos] + g13[current_pos] - g14[current_pos] +
-	     0.50 * fx ) * irho;
+	     0.50 * fx ) * 1.0/rho;
       uy = ( g3[current_pos] - g4[current_pos] + g7[current_pos] - g8[current_pos] - g9[current_pos] +
 	     g10[current_pos] + g15[current_pos] - g16[current_pos] + g17[current_pos] - g18[current_pos] +
-	     0.50 * fy ) * irho;
+	     0.50 * fy ) * 1.0/rho;
       uz = ( g5[current_pos] - g6[current_pos] + g11[current_pos] - g12[current_pos] - g13[current_pos] +
 	     g14[current_pos] + g15[current_pos] - g16[current_pos] - g17[current_pos] + g18[current_pos] +
-	     0.50 * fz ) * irho;
+	     0.50 * fz ) * 1.0/rho;
       
       af = 0.50 * gamma * mu_phi * itauphi;
       cf = itauphi * ieta * current_phi;

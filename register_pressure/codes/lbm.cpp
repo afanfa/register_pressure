@@ -21,7 +21,7 @@ __global__ void kernel (double *phi, double *laplacian_phi,
   int m, current_pos;
 
   double mu_phi, current_phi, current_phi_2;
-  double rho, irho;
+  double rho;
   double fx, fy, fz;
   double uf, ux, uy, uz, v;
   double af, ag, cf;
@@ -41,8 +41,6 @@ __global__ void kernel (double *phi, double *laplacian_phi,
 	g10[current_pos] + g11[current_pos] + g12[current_pos] + g13[current_pos] + g14[current_pos] +
 	g15[current_pos] + g16[current_pos] + g17[current_pos] + g18[current_pos];
       
-      irho = 1.0/rho;
-      
       mu_phi = alpha * current_phi * ( current_phi_2 - phi2 ) - k * laplacian_phi[m];
 
       fx = mu_phi * grad_phi_x[m];
@@ -51,13 +49,13 @@ __global__ void kernel (double *phi, double *laplacian_phi,
 
       ux = ( g1[current_pos] - g2[current_pos] + g7[current_pos] - g8[current_pos] + g9[current_pos] -
 	     g10[current_pos] + g11[current_pos] - g12[current_pos] + g13[current_pos] - g14[current_pos] +
-	     0.50 * fx ) * irho;
+	     0.50 * fx ) * 1.0/rho;
       uy = ( g3[current_pos] - g4[current_pos] + g7[current_pos] - g8[current_pos] - g9[current_pos] +
 	     g10[current_pos] + g15[current_pos] - g16[current_pos] + g17[current_pos] - g18[current_pos] +
-	     0.50 * fy ) * irho;
+	     0.50 * fy ) * 1.0/rho;
       uz = ( g5[current_pos] - g6[current_pos] + g11[current_pos] - g12[current_pos] - g13[current_pos] +
 	     g14[current_pos] + g15[current_pos] - g16[current_pos] - g17[current_pos] + g18[current_pos] +
-	     0.50 * fz ) * irho;
+	     0.50 * fz ) * 1.0/rho;
       
       af = 0.50 * gamma * mu_phi * itauphi;
       cf = itauphi * ieta * current_phi;

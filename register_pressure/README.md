@@ -58,20 +58,24 @@ Once the register pressure situation has been assessed/confirmed, there are a fe
 
 <p>
 
-1. **Move variable declaration/assignment close to where they are used**. Assigning one or multiple variable at the top of a GPU kernel and use them at the very bottom forces the compiler those variables stored in register or scratch until they are used, thus impacting
+1. ** Set the *__launch_bounds__* qualifier for each kernel **. By default, The compiler assumes that the block size of each kernel is composed by 1024 work item. When * __launch_bounds__ * is defined, the compiler can make more appropriate decision in register allocation, thus improving
+the register pressure.
+
+2. **Move variable declaration/assignment close to where they are used**. Assigning one or multiple variable at the top of a GPU kernel and use them at the very bottom forces the compiler those variables stored in register or scratch until they are used, thus impacting
 the possibility of using those registers for more performance critical variables. By moving the declaration/assignment close to their first use will help the heuristic techniques to make more efficient choices on the rest of the code.
 
-2. **Avoid allocating data on the stack**. Memory allocated on the stack (e.g., double array[10]) lives in scratch memory and it may be stored into registers by the compiler as an optimization step.
+3. **Avoid allocating data on the stack**. Memory allocated on the stack (e.g., double array[10]) lives in scratch memory and it may be stored into registers by the compiler as an optimization step.
 If your application makes use of memory allocated on the stack, seeing scratch memory usage should not be a big surprise.
 
-3. **Avoid passing big object as kernel arguments**. Function arguments are allocated on the stack and may be optimized into registers as an optimization.
+4. **Avoid passing big object as kernel arguments**. Function arguments are allocated on the stack and may be optimized into registers as an optimization.
 
-4. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inline device functions, including math function and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
+5. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inline device functions, including math function and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
 As an example, replacing _pow(var,2.0)_ with a simple _var*var_ can significantly reduce register pressure.
 
-5. **Keep loop unrolling under control**. Loop unrolling can be obtained by adding a _#pragma unroll_ command on a loop where the number of iterations is known at compile time. By doing so, all the iterations are completely unrolled, thus reducing the cost of checking the exit condition for the loop.
+6. **Keep loop unrolling under control**. Loop unrolling can be obtained by adding a _#pragma unroll_ command on a loop where the number of iterations is known at compile time. By doing so, all the iterations are completely unrolled, thus reducing the cost of checking the exit condition for the loop.
 On the other hand, unrolling increases the register pressure because more variables need to be store in registers at the same time. In cases where register pressure is a concern, the use of loop unrolling should be limited.
 
-6. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few register per thread.
+7. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few register per thread.
 
-## Examples
+##  ##
+
