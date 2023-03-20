@@ -1,6 +1,6 @@
 #include "hip/hip_runtime.h"
 
-__global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  laplacian_phi,
+__global__ void kernel (double *  phi, double *  laplacian_phi,
 						  double *  grad_phi_x, double *  grad_phi_y, double *  grad_phi_z,
 						  double *  f0, double *  f1, double *  f2, double *  f3, double *  f4,
 						  double *  f5, double *  f6,
@@ -42,19 +42,21 @@ __global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  lapla
 	g15[current_pos] + g16[current_pos] + g17[current_pos] + g18[current_pos];
       
       mu_phi = alpha * current_phi * ( current_phi_2 - phi2 ) - k * laplacian_phi[m];
-
-      f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi; //closer to first use
       
       fx = mu_phi * grad_phi_x[m];
       fy = mu_phi * grad_phi_y[m];
       fz = mu_phi * grad_phi_z[m];
 
+      f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi; //closer to first use
+      
       ux = ( g1[current_pos] - g2[current_pos] + g7[current_pos] - g8[current_pos] + g9[current_pos] -
 	     g10[current_pos] + g11[current_pos] - g12[current_pos] + g13[current_pos] - g14[current_pos] +
 	     0.50 * fx ) * 1.0/rho;
+
       uy = ( g3[current_pos] - g4[current_pos] + g7[current_pos] - g8[current_pos] - g9[current_pos] +
 	     g10[current_pos] + g15[current_pos] - g16[current_pos] + g17[current_pos] - g18[current_pos] +
 	     0.50 * fy ) * 1.0/rho;
+      
       uz = ( g5[current_pos] - g6[current_pos] + g11[current_pos] - g12[current_pos] - g13[current_pos] +
 	     g14[current_pos] + g15[current_pos] - g16[current_pos] - g17[current_pos] + g18[current_pos] +
 	     0.50 * fz ) * 1.0/rho;
@@ -62,7 +64,7 @@ __global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  lapla
       af = 0.50 * gamma * mu_phi * itauphi;
       cf = itauphi * ieta * current_phi;
 
-      // f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi;
+      //f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi;
       
       f1[current_pos] = itauphi1 * f1[current_pos] + af + cf * ux;
       f2[current_pos] = itauphi1 * f2[current_pos] + af - cf * ux;
