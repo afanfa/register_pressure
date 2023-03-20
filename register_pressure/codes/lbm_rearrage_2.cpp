@@ -43,6 +43,8 @@ __global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  lapla
       
       mu_phi = alpha * current_phi * ( current_phi_2 - phi2 ) - k * laplacian_phi[m];
 
+      f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi; //closer to first use
+      
       fx = mu_phi * grad_phi_x[m];
       fy = mu_phi * grad_phi_y[m];
       fz = mu_phi * grad_phi_z[m];
@@ -59,8 +61,8 @@ __global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  lapla
       
       af = 0.50 * gamma * mu_phi * itauphi;
       cf = itauphi * ieta * current_phi;
-      
-      f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi;
+
+      // f0[m] = itauphi1 * f0[m] + -3.0 * gamma * mu_phi * itauphi + itauphi * current_phi;
       
       f1[current_pos] = itauphi1 * f1[current_pos] + af + cf * ux;
       f2[current_pos] = itauphi1 * f2[current_pos] + af - cf * ux;
@@ -72,6 +74,9 @@ __global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  lapla
       ag  = 3.0 * current_phi * mu_phi + rho;
       eg1ag = eg1 * ag;
       eg2ag = eg2 * ag;
+
+      eg1rho = eg1 * rho;
+      eg2rho = eg2 * rho;
 
       v  = 1.50 * ( ux*ux + uy*uy + uz*uz );
       uf = ux * fx + uy * fy + uz * fz;
@@ -95,9 +100,6 @@ __global__ __launch_bounds__ (256,1) void kernel (double *  phi, double *  lapla
       
       g5[m+next + ldx*ldy] = itaurho * g5[current_pos] + tmp1 + tmp2;
       g6[m+next - ldx*ldy] = itaurho * g6[current_pos] + tmp1 - tmp2;
-
-      eg1rho = eg1 * rho; //closer to first use
-      eg2rho = eg2 * rho;
       
       tmp1 = eg2ag + eg2rho * ( 0.50 * ( ux + uy ) * ( ux + uy ) - v ) +
 	egc2 * ( ( ux + uy ) * ( fx + fy ) - uf );
