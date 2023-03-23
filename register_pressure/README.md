@@ -382,3 +382,62 @@ lbm_rearrage_2.cpp:16:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-reso
 lbm_rearrage_2.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
 ```
 
+# On the use of the *restrict* keyword #
+
+In the C-type languages like C++, aliasing is one of the main limitations to achieve high performance. To avoid this problem, the standard C99 introduced "restricted pointers": a way for the user to tell the compiler that different object pointer types and function parameter
+arrays do not point to overlapping memory regions. This allows the compiler to perform aggressive optimizations that may be otherwise prevented because of aliasing.
+The use of restricted pointers *may* increase register pressure because the compiler will try to reuse more data by storing it in registers.
+On AMD hardware this is not always the case and sometimes using the *restrict* is beneficial to reduce both SGPRs and VGPRs pressure.
+As a rule of thumb, the use of *restrict* on function arguments will tend to reduce SGPRs usage with a chance of increasing VGPRs usage.
+
+As an example, let us add the *restrict* keyword to the *g14* array because it gets reused several times in the rest of the code and we may achieve higher performance from the reuse.
+
+
+```C++
+__global__ void kernel (double *  phi, double *  laplacian_phi,
+						  double *  grad_phi_x, double * grad_phi_y, double *  grad_phi_z,
+						  double *  f0, double *  f1, double *  f2, double *  f3, double *  f4,
+						  double *  f5, double *  f6,
+						  double *  g0, double *  g1, double *  g2, double *  g3, double *  g4,
+						  double *  g5, double *  g6, double*  g7, double *  g8, double *  g9,
+						  double *  g10, double *  g11, double *  g12, double *  g13, double * __restrict__ g14,
+						  double *  g15, double *  g16, double *  g17, double *  g18,
+						  int nx, int ny, int nz, int ldx, int ldy, int current, int next,
+						  double k, double alpha, double phi2, double gamma,
+						  double itauphi, double itauphi1, double ieta,
+						  double itaurho, double grav,
+						  double eg1, double eg2, double eg0, double egc0, double egc1, double egc2)
+
+```
+
+the result is a reduction in register pressure for both, SGPRs and VGPRs:
+
+```
+lbm_2_restrict.cpp:16:1: remark: Function Name: _Z6kernelPdS_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_iiiiiiiddddddddddddddd [-Rpass-analysis=kernel-resource-usage]
+{
+^
+lbm_2_restrict.cpp:16:1: remark:     SGPRs: 86 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     VGPRs: 94 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+```
+
+By adding *restrict* to the variable *g7* we observe a further reduction in SGPRs usage and slight increase in VGPRs that still keeps occupancy at 5 waves/SIMD
+
+```
+lbm_2_restrict.cpp:16:1: remark: Function Name: _Z6kernelPdS_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_iiiiiiiddddddddddddddd [-Rpass-analysis=kernel-resource-usage]
+{
+^
+lbm_2_restrict.cpp:16:1: remark:     SGPRs: 78 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     VGPRs: 96 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     AGPRs: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     ScratchSize [bytes/lane]: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     Occupancy [waves/SIMD]: 5 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
+lbm_2_restrict.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
+```
