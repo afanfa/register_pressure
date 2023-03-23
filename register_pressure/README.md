@@ -58,11 +58,11 @@ Once the register pressure situation has been assessed/confirmed, there are a fe
 
 <p>
 
-1. ** Set the *__launch_bounds__* qualifier for each kernel **. By default, The compiler assumes that the block size of each kernel is composed by 1024 work item. When * __launch_bounds__ * is defined, the compiler can make more appropriate decision in register allocation, thus improving
+1. **Set the *__launch_bounds__* qualifier for each kernel**. By default, The compiler assumes that the block size of each kernel is composed by 1024 work item. When *__launch_bounds__* is defined, the compiler can make more appropriate decision in register allocation, thus improving
 the register pressure.
 
-2. **Move variable declaration/assignment close to where they are used**. Assigning one or multiple variable at the top of a GPU kernel and use them at the very bottom forces the compiler those variables stored in register or scratch until they are used, thus impacting
-the possibility of using those registers for more performance critical variables. By moving the declaration/assignment close to their first use will help the heuristic techniques to make more efficient choices on the rest of the code.
+2. **Move variable definition/assignment close to where they are used**. Defining one or multiple variable at the top of a GPU kernel and use them at the very bottom forces the compiler those variables stored in register or scratch until they are used, thus impacting
+the possibility of using those registers for more performance critical variables. By moving the definition/assignment close to their first use will help the heuristic techniques to make more efficient choices on the rest of the code.
 
 3. **Avoid allocating data on the stack**. Memory allocated on the stack (e.g., double array[10]) lives in scratch memory and it may be stored into registers by the compiler as an optimization step.
 If your application makes use of memory allocated on the stack, seeing scratch memory usage should not be a big surprise.
@@ -295,7 +295,7 @@ lbm_nopow_1.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=ker
 
 Althogh the reduction may now seem significant, this will allow more room for improvement in later optimizations.
 
-## Optimization n.2: move variable assignment close to their use ##
+## Optimization n.2: move variable definition close to its first use ##
 
 Once a variable is defined, its value is store in a register for future use. Defining variables at the beginning of the kernel and using them at the end will dramatically increase register usage.
 A second optimization that may provide significant benefit is to look for cases where variables are defined "far away" from their first use and manually rearrange the code.
