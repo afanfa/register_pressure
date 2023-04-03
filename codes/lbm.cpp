@@ -141,4 +141,4 @@ __global__ void kernel (double *phi, double *laplacian_phi,
       g18[m+next - ldx + ldx*ldy] = itaurho * g18[current_pos] + tmp1 - tmp2;
       
     }
-  }
+}
