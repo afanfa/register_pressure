@@ -9,7 +9,7 @@ In this blog post, we will focus on the AMD CDNA2 architecture (MI200 series car
 ## Registers and Occupancy ##
 
 General purpose registers are the fastest type of memory available in modern processors. In most cases, the ALUs (Arithmetic Logic Units) in traditional processor and accelerators can only directly access registers.
-Unfortunately, registers are a scarse and expensive resource and compilers try their best to *optimize* the way logical variables are assigned to hardware registers to be manipulated by the ALU.
+Unfortunately, registers are a scarce and expensive resource and compilers try their best to *optimize* the way logical variables are assigned to hardware registers to be manipulated by the ALU.
 
 When we use the word *optimize* we should always clarify the objective of the optimization process. In fact, regular CPUs and accelerators (like GPUs), because of their very nature, have different ways of executing programs and achieving high performance.
 Traditional CPUs are latency-oriented machines, designed to execute as many instructions as possible belonging to a single serial thread. On the other hand, GPUs are throughput-oriented machines, designed to take advantage
@@ -22,17 +22,19 @@ The term *occupancy* represents the maximum number of wavefronts that can run on
 Ideally, we would like to have as much occupancy as possible, all the time. In reality, occupancy is limited by hardware design choices and resource limitations dictated by the shader code / kernel (HIP, OpenCL, etc.) running on the card.
 For example, each CU of the AMD CDNA2 cards has four sets of wavefront slots, each of which can manage at the most **eight** wavefronts. This means that the physical limit to occupancy in CDNA2 is 32 wavefronts per CU.
 
-The number of registers needed by a kernel is one of the most relevant factors deciding occupancy (another factor is the amount of LDS memory used).
+The number of registers needed by a kernel is one of the most relevant factors deciding occupancy (another factor is the amount of LDS memory requested).
 The following table summarizes the maximum level of occupancy achievable on CDNA2 cards as a function of the number of VGPRs used by a kernel.
 
 [CDNA2 Occupancy VGPR](img/occupancy_vgpr.JPG)
 
+Table 1.
+
 ## Register Spilling ##
 
 Register allocation is the process of assigning local variables and expression results of a GPU kernel to the registers available on the hardware. It is performed by the compiler at compilation time, and it is influenced by other stages like instruction scheduling.
-Finding an optimal solution to this problem is hard (NP-Hard) and heuristic techniques need to be adopted to find sub-optimal solutions in a reasonable amount of time.
+Finding an optimal solution to this problem is hard (NP-Hard) and heuristic techniques must to be adopted to find close-to-optimal solutions in a reasonable amount of time.
 
-The compiler tries to apply heuristic techniques to maximize occupancy by reducing the need for registers following Table 1. When the amount of register requested starts becoming high performance is penalized by "register pressure" which leads to low occupancy and scratch memory usage.
+The compiler tries to apply heuristic techniques to maximize occupancy by reducing the need for registers following Table 1. When the amount of registers requested becomes too high, performance is penalized by "register pressure" which leads to low occupancy and scratch memory usage.
 
 Sometimes, the compiler may decide that it is fruitful to reach a better level of occupancy even though the request for registers is higher
 than the limit reported in Table 1 (e.g., need for 134 registers but compiler allocates only 128 and the rest in scratch memory). This higher level of occupancy can be achieved by saving some variables in scratch memory: a portion of local memory, private to the thread, resident in 
@@ -46,15 +48,15 @@ the performance will suffer of low occupancy (1 wave per CU in the worst case) a
 
 ## How to reduce register pressure ##
 
-As mentioned before, the compiler applies sub-optimal heuristic techniques to maximize occupancy by minimizing the amount of register needed by a certain GPU kernels. These heuristic techniques sometimes fail to be close enough to an optimal solution and the programmer is required to restructure the code
+As mentioned before, the compiler applies heuristic techniques to maximize occupancy by minimizing the amount of registers needed by a certain GPU kernels. These heuristic techniques sometimes fail to be close enough to an optimal solution and the programmer is required to restructure the code
 in order to reduce register pressure and increase performance.
 
 In this section, we will go through the steps of how to recognize a register pressure problem and how to mitigate it.
 
-First of all, the amount of registers used by kernel can be detected in two ways: 1) compiling the file containing the kernels with the *-Rpass-analyze=kernel-resource-usage* flag, which will print at screen all the resource usage required by each kernel contained in the file at compile time.
-Some of the information include SGPRs, VGPRs, ScratchSize, VGPR/SGPR spills, Occupancy, and LDS usage. 2) Compiling with *--save-temps* and look into the *hip-amdgcn-amd-amdhsa-gfx90a.s file for ".vgpr_spill_count".
+First of all, the amount of registers used by kernel can be detected in two ways: 1) compiling the file containing the kernels with the *-Rpass-analyze=kernel-resource-usage* flag, which will print at screen all the resource usage required by each kernel contained in the file at compile time;
+some of the information include SGPRs, VGPRs, ScratchSize, VGPR/SGPR spills, Occupancy, and LDS usage. 2) Compiling with *--save-temps* and look into the *hip-amdgcn-amd-amdhsa-gfx90a.s file for ".vgpr_spill_count".
 
-Once the register pressure situation has been assessed/confirmed, there are a few tactics that can be adopted in the code to reduce it. 
+Once the register pressure situation has been assessed/confirmed, there are a few techniques that can be applied to the code to reduce register pressure.
 
 <p>
 
@@ -67,15 +69,15 @@ the possibility of using those registers for more performance critical variables
 3. **Avoid allocating data on the stack**. Memory allocated on the stack (e.g., double array[10]) lives in scratch memory and it may be stored into registers by the compiler as an optimization step.
 If your application makes use of memory allocated on the stack, seeing scratch memory usage should not be a big surprise.
 
-4. **Avoid passing big object as kernel arguments**. Function arguments are allocated on the stack and may be optimized into registers as an optimization.
+4. **Avoid passing big objects as kernel arguments**. Function arguments are allocated on the stack and may be optimized into registers as an optimization.
 
-5. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inline device functions, including math function and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
+5. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inline device functions, including math functions and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
 As an example, replacing _pow(var,2.0)_ with a simple _var*var_ can significantly reduce register pressure.
 
-6. **Keep loop unrolling under control**. Loop unrolling can be obtained by adding a _#pragma unroll_ command on a loop where the number of iterations is known at compile time. By doing so, all the iterations are completely unrolled, thus reducing the cost of checking the exit condition for the loop.
+6. **Keep loop unrolling under control**. Loop unrolling can be obtained by adding a _#pragma unroll_ command on a loop where the number of iterations is known at compile time. By doing so, all the iterations are completely unrolled, thus reducing the cost of checking the exit condition of the loop.
 On the other hand, unrolling increases the register pressure because more variables need to be store in registers at the same time. In cases where register pressure is a concern, the use of loop unrolling should be limited.
 
-7. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few register per thread.
+7. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few registers per thread.
 
 # Example #
 
@@ -246,7 +248,7 @@ lbm.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-reso
 ```
 
 Although there is no register spilling, we notice that the occupancy is just four waves per SIMD unit; about half of the best case.
-By looking at the occupancy table listed above, we see that we would need to reduce the amount of used VGPRS from 102 to 96 or below in order to reach an occupancy of 5 waves/SIMD.
+By looking at the occupancy table (Table 1), we see that we would need to reduce the amount of used VGPRS from 102 to 96 or below in order to reach an occupancy of 5 waves/SIMD.
 
 ## Optimization n.1: remove unnecessary math function invocations ##
 
@@ -262,7 +264,7 @@ Looking at the following code, we notice the use of the _pow_ function needed to
       current_phi_2 = pow(current_phi,2.0);
 ```
 
-As we mentioned before, the compiler will currently inline all the invocations to device functions, including math functions calls.
+As we mentioned before, the compiler will currently inline all the invocations to device functions, including math functions.
 A possible optimization is to replace the general purpose function _pow_ with a specific code for squaring the variable as follows:
 
 ```C++
@@ -293,7 +295,7 @@ lbm_nopow_1.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=ker
 
 ```
 
-Althogh the reduction may now seem significant, this will allow more room for improvement in later optimizations.
+Although the reduction may not seem significant, this will allow for more room for improvement in later optimizations.
 
 ## Optimization n.2: move variable definition close to its first use ##
 
