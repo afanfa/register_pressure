@@ -25,9 +25,10 @@ For example, each CU of the AMD CDNA2 cards has four sets of wavefront slots, ea
 The number of registers needed by a kernel is one of the most relevant factors deciding occupancy (another factor is the amount of LDS memory requested).
 The following table summarizes the maximum level of occupancy achievable on CDNA2 cards as a function of the number of VGPRs used by a kernel.
 
-[CDNA2 Occupancy VGPR](img/occupancy_vgpr.JPG)
-
-Table 1.
+<img src="img/occupancy_vgpr.JPG" width="600px"  class="img-center">
+<p style="text-align:center">
+Table 1: Occupancy due to VGPRs usage in MI200
+</p>
 
 ## Register Spilling ##
 
