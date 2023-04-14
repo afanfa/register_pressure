@@ -4,12 +4,12 @@ The following blog post is focused on a practical demo showing how to apply the 
 OLCF training talk on August 23rd 2022. Here is a [link](https://docs.olcf.ornl.gov/training/training_archive.html) to the training archive where you can also find the slides
 presented during the talk.
 
-In this blog post, we will focus on the AMD CDNA2 architecture (MI200 series cards) using ROCm 5.4.
+In this blog post, we will focus on the AMD CDNA2\texttrademark architecture (MI200 series cards) using ROCm 5.4.
 
 ## Registers and Occupancy ##
 
 General purpose registers are the fastest type of memory available in traditional processors. In most cases, the ALUs (Arithmetic Logic Units) in traditional processor and accelerators can only directly access registers.
-Unfortunately, registers are a scarce and expensive resource and compilers try their best to *optimize* the way logical variables are assigned to hardware registers to be manipulated by the ALU.
+Unfortunately, registers are a scarce and expensive resource and compilers try their best to *optimize* the way local variables are assigned to hardware registers to be manipulated by the ALU.
 
 When we use the word *optimize* we should always clarify the objective of the optimization process. In fact, regular CPUs and accelerators (like GPUs), because of their very nature, have different ways of executing programs and achieving high performance.
 Traditional CPUs are latency-oriented machines, designed to execute as many instructions as possible belonging to a single serial thread. On the other hand, GPUs are throughput-oriented machines, designed to take advantage
@@ -35,7 +35,7 @@ Table 1: Occupancy related to VGPRs usage in MI200
 Register allocation is the process of assigning local variables and expression results of a GPU kernel to the registers available on the hardware. It is performed by the compiler at compilation time, and it is influenced by other stages like instruction scheduling.
 Finding an optimal solution to this problem is hard (NP-Hard) and heuristic techniques must to be adopted to find close-to-optimal solutions in a reasonable amount of time.
 
-The compiler tries to apply heuristic techniques to maximize occupancy by reducing the need for registers following Table 1. When the amount of registers requested becomes too high, performance is penalized by "register pressure" which leads to low occupancy and scratch memory usage.
+The compiler tries to apply heuristic techniques to maximize occupancy by reducing the need for registers following Table 1. When the number of registers requested becomes too high, performance is penalized by "register pressure" which leads to low occupancy and scratch memory usage.
 
 Sometimes, the compiler may decide that it is fruitful to reach a better level of occupancy even though the request for registers is higher
 than the limit reported in Table 1 (e.g., need for 134 registers but compiler allocates only 128 and the rest in scratch memory). This higher level of occupancy can be achieved by saving some variables in [scratch memory](https://llvm.org/docs/AMDGPUUsage.html#amdgpu-address-spaces): a portion of local memory, private to the thread, backed by global memory and much slower than register memory. This technique is called "register spilling".
@@ -43,40 +43,39 @@ than the limit reported in Table 1 (e.g., need for 134 registers but compiler al
 Although observing scratch memory usage can be seen as a red flag for high register pressure, it should be considered in a broader performance context. In fact, achieving higher occupancy by saving a few registers can provide a substantial performance benefit as opposed to a lower
 occupancy without any scratch memory usage.
 
-In cases when the register pressure (request for registers) is way higher than the amount of hardware register available,
-the performance will suffer of low occupancy (1 wave per CU in the worst case) and high cost of accessing the register variables that needed to be "spilled" to scratch memory.
+In cases when the register pressure (request for registers) is way higher than the number of hardware registers available,
+the performance will suffer from low occupancy (1 wave per CU in the worst case) and high cost of accessing the register variables that needed to be "spilled" to scratch memory.
 
-## How to reduce register pressure ##
+## How to Reduce Register Pressure ##
 
-As mentioned before, the compiler applies heuristic techniques to maximize occupancy by minimizing the amount of registers needed by a certain GPU kernels. These heuristic techniques sometimes fail to be close enough to an optimal solution and the programmer is required to restructure the code
+As mentioned before, the compiler applies heuristic techniques to maximize occupancy by minimizing the number of registers needed by a certain GPU kernels. These heuristic techniques sometimes fail to be close enough to an optimal solution and the programmer is required to restructure the code
 in order to reduce register pressure and increase performance.
 
 In this section, we will go through the steps of how to recognize a register pressure problem and how to mitigate it.
 
-First of all, the amount of registers used by kernel can be detected in two ways: 1) compiling the file containing the kernels with the *-Rpass-analyze=kernel-resource-usage* flag, which will print at screen all the resource usage required by each kernel contained in the file at compile time;
-some of the information include SGPRs, VGPRs, ScratchSize, VGPR/SGPR spills, Occupancy, and LDS usage. 2) Compiling with *--save-temps* and look into the *hip-amdgcn-amd-amdhsa-gfx90a.s file for ".vgpr_spill_count". All the information reported by the *-Rpass-analyze=kernel-resource-usage* flag
+First of all, the number of registers used by GPU kernels can be detected in two ways: 1) compiling the file containing the kernels with the `-Rpass-analyze=kernel-resource-usage` flag, which will print to screen the resource usage of each kernel in the file at compile time;
+some of the information include SGPRs, VGPRs, ScratchSize, VGPR/SGPR spills, Occupancy, and LDS usage. 2) Compiling with `--save-temps` and looking in the *hip-amdgcn-amd-amdhsa-gfx90a.s file for ".vgpr_spill_count". All the information reported by the `-Rpass-analyze=kernel-resource-usage` flag
 are also in here.
 
 Once the register pressure situation has been assessed/confirmed, there are a few techniques that can be applied to the code to reduce register pressure.
 
 <p>
 
-1. **Set the *__launch_bounds__* qualifier for each kernel**. By default, the compiler assumes that the block size of each kernel is composed by 1024 work item. When *__launch_bounds__* is defined, the compiler can make more appropriate decision in register allocation, thus improving
-the register pressure.
+1. **Set the `__launch_bounds__` qualifier for each kernel**. By default, the compiler assumes that the block size of each kernel is 1024 work items. When `__launch_bounds__` is defined, the compiler can allocate registers appropriately, thus potentially lowering the register pressure.
 
-2. **Move variable definition/assignment close to where they are used**. Defining one or multiple variable at the top of a GPU kernel and using them at the very bottom forces the compiler those variables stored in register or scratch until they are used, thus impacting
-the possibility of using those registers for more performance critical variables. By moving the definition/assignment close to their first use will help the heuristic techniques to make more efficient choices on the rest of the code.
+2. **Move variable definition/assignment close to where they are used**. Defining one or multiple variables at the top of a GPU kernel and using them at the very bottom forces the compiler those variables stored in register or scratch until they are used, thus impacting
+the possibility of using those registers for more performance critical variables. Moving the definition/assignment close to their first use will help the heuristic techniques make more efficient choices for the rest of the code.
 
 3. **Avoid allocating data on the stack**. Memory allocated on the stack (e.g., double array[10]) lives in scratch memory by default and it may be stored into registers by the compiler as an optimization step.
 If your application makes use of memory allocated on the stack, seeing scratch memory usage should not be a big surprise.
 
-4. **Avoid passing big objects as kernel arguments**. Function arguments are allocated on the stack and may be optimized into registers as an optimization. Sometimes, storing these arguments as *constant* may help.
+4. **Avoid passing big objects as kernel arguments**. Function arguments are allocated on the stack and may be saved into registers as an optimization. Sometimes, storing these arguments as *constant* may help.
 
-5. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inline device functions, including math functions and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
+5. **Avoid writing large kernels with many function calls (including math functions and assertions)**. Currently, the compiler always inlines device functions, including math functions and assertions. Having many of these function calls introduces extra code and potentially higher register pressure.
 As an example, replacing _pow(var,2.0)_ with a simple _var*var_ can significantly reduce register pressure.
 
 6. **Keep loop unrolling under control**. Loop unrolling can be obtained by adding a _#pragma unroll_ command on a loop where the number of iterations is known at compile time. By doing so, all the iterations are completely unrolled, thus reducing the cost of checking the exit condition of the loop.
-On the other hand, unrolling increases the register pressure because more variables need to be store in registers at the same time. In cases where register pressure is a concern, the use of loop unrolling should be limited. Note that the Clang compiler tends to be much more literal in unrolling loops than other compilers.
+On the other hand, unrolling increases register pressure because more variables need to be stored in registers at the same time. In cases where register pressure is a concern, the use of loop unrolling should be limited. Note that the Clang compiler tends to be much more literal in unrolling loops than other compilers.
 
 7. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few registers per thread.
 
@@ -249,7 +248,7 @@ lbm.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-reso
 ```
 
 Although there is no register spilling, we notice that the occupancy is just four waves per SIMD unit; about half of the best case.
-By looking at the occupancy table (Table 1), we see that we would need to reduce the amount of used VGPRS from 102 to 96 or below in order to reach an occupancy of 5 waves/SIMD.
+By looking at the occupancy table (Table 1), we see that we would need to reduce the number of used VGPRS from 102 to 96 or below in order to reach an occupancy of 5 waves/SIMD.
 
 ## Optimization n.1: remove unnecessary math function invocations ##
 
@@ -278,7 +277,7 @@ A possible optimization is to replace the general purpose function _pow_ with a 
       current_phi_2 = current_phi * current_phi;
 ```
 
-Recompiling the new code we observe that our change decreased VGPRs usage from 106 to 102:
+Recompiling the new code we observe that our change decreased VGPRs usage from 102 to 100:
 
 ```
 hipcc --offload-arch=gfx90a lbm_nopow_1.cpp -Rpass-analysis=kernel-resource-usage -c
@@ -300,7 +299,7 @@ Although the reduction may not seem significant, this will allow for more room f
 
 ## Optimization n.2: move variable definition close to its first use ##
 
-Once a variable is defined, its value is store in a register for future use. Defining variables at the beginning of the kernel and using them at the end will dramatically increase register usage.
+Once a variable is defined, its value is stored in a register for future use. Defining variables at the beginning of the kernel and using them at the end will dramatically increase register usage.
 A second optimization that may provide significant benefit is to look for cases where variables are defined "far away" from their first use and manually rearrange the code.
 
 After a quick visual inspections we can see that the definition of array location  _f[m]_ does not depend on _ux_, _uy_, or _uz_ as opposed to
@@ -413,7 +412,7 @@ __global__ void kernel (double *  phi, double *  laplacian_phi,
 
 ```
 
-the result is a reduction in register pressure for both, SGPRs and VGPRs:
+the result is a reduction in register pressure for both SGPRs and VGPRs:
 
 ```
 lbm_2_restrict.cpp:16:1: remark: Function Name: _Z6kernelPdS_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_S_iiiiiiiddddddddddddddd [-Rpass-analysis=kernel-resource-usage]
