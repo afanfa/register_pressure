@@ -4,7 +4,7 @@ The following blog post is focused on a practical demo showing how to apply the 
 OLCF training talk on August 23rd 2022. Here is a [link](https://docs.olcf.ornl.gov/training/training_archive.html) to the training archive where you can also find the slides
 presented during the talk.
 
-In this blog post, we will focus on the AMD CDNA2\texttrademark architecture (MI200 series cards) using ROCm 5.4.
+In this blog post, we will focus on the AMD CDNA2™ architecture (MI200 series cards) using ROCm 5.4.
 
 ## Registers and Occupancy ##
 
