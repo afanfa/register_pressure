@@ -1,4 +1,4 @@
-# Register Pressure in AMD CDNA2 Accelerators #
+# Register pressure in AMD CDNA2 GPUs #
 
 The following blog post is focused on a practical demo showing how to apply the recommendations explained in the following [talk](https://vimeo.com/742349001) presented as an
 OLCF training talk on August 23rd 2022. Here is a [link](https://docs.olcf.ornl.gov/training/training_archive.html) to the training archive where you can also find the slides
@@ -6,7 +6,7 @@ presented during the talk.
 
 In this blog post, we will focus on the AMD CDNA2™ architecture (MI200 series cards) using ROCm 5.4.
 
-## Registers and Occupancy ##
+## Registers and occupancy ##
 
 General purpose registers are the fastest type of memory available in traditional processors. In most cases, the ALUs (Arithmetic Logic Units) in traditional processor and accelerators can only directly access registers.
 Unfortunately, registers are a scarce and expensive resource and compilers try their best to *optimize* the way local variables are assigned to hardware registers to be manipulated by the ALU.
@@ -42,7 +42,7 @@ The following table summarizes the maximum level of occupancy achievable on CDNA
 Table 1: Occupancy related to VGPRs usage in MI200
 </p>
 
-## Register Spilling ##
+## Register spilling ##
 
 Register allocation is the process of assigning local variables and expression results of a GPU kernel to the registers available on the hardware. It is performed by the compiler at compilation time, and it is influenced by other stages like instruction scheduling.
 Finding an optimal solution to this problem is hard (NP-Hard) and heuristic techniques must to be adopted to find close-to-optimal solutions in a reasonable amount of time.
@@ -91,7 +91,7 @@ On the other hand, unrolling increases register pressure because more variables 
 
 7. **Manually spill to LDS**. As a last resort, it can be beneficial to use some LDS memory to manually store variables (possibly the ones with the longest liveness) and save a few registers per thread.
 
-# Example #
+## Example ##
 
 For the rest of the post, we will focus our discussion on the following code:
 
@@ -262,7 +262,7 @@ lbm.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-reso
 Although there is no register spilling, we notice that the occupancy is just four waves per SIMD unit; about half of the best case.
 By looking at the occupancy table (Table 1), we see that we would need to reduce the number of used VGPRS from 102 to 96 or below in order to reach an occupancy of 5 waves/SIMD.
 
-## Optimization n.1: remove unnecessary math function invocations ##
+### Optimization n.1: remove unnecessary math function invocations ###
 
 Looking at the following code, we notice the use of the _pow_ function needed to square the variable __current_phi__.
 
@@ -309,7 +309,7 @@ lbm_nopow_1.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=ker
 
 Although the reduction may not seem significant, this will allow for more room for improvement in later optimizations.
 
-## Optimization n.2: move variable definition close to its first use ##
+### Optimization n.2: move variable definition close to its first use ###
 
 Once a variable is defined, its value is stored in a register for future use. Defining variables at the beginning of the kernel and using them at the end will dramatically increase register usage.
 A second optimization that may provide significant benefit is to look for cases where variables are defined "far away" from their first use and manually rearrange the code.
@@ -456,7 +456,7 @@ lbm_2_restrict.cpp:16:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-reso
 lbm_2_restrict.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
 ```
 
-## Conclusion ##
+# Conclusion #
 
 In this post we describe at high level the nature and consequences of register pressure for HPC applications related to the CDNA2 architecture. We also provide a set of rules that have been found effective in reducing register pressure and increasing occupancy.
 It is important to highlight that the results shown in this blog post can be entirely replicated only on CDNA2 cards when ROCm 5.4 is used. The ever changing nature of the compiler and its heuristics may alter the outcome of the code examples shown in this post when a ROCm version different from 5.4 is used.
