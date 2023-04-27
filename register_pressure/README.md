@@ -19,6 +19,18 @@ In AMD GPUs, a high number of concurrent wavefronts running on the same Compute 
 
 The term *occupancy* represents the maximum number of wavefronts that can potentially run on the same CU at the same time. In general, having higher occupancy helps achieve better performance by hiding costly memory accesses with other operations, but this is not always the case.
 
+In Figure 1 we show a schematic representation of a CU in the CDNA2 architecture. The Vector General Purpose Registers (VGPRs) are used to store data that is not uniform across the wavefront (different for each thread in the wavefront).
+They are the most general purpose registers available in the CU and they are directly manipulated by the Vector ALU (VALU). The VALU is responsible for executing most of the work in the CU, including floating-point operations (FLOPs), loads from memory, integer and logical operations, etc.
+
+The Scalar General Purpose Registers (SGPRs) represent a set of registers used to store data that is known to be uniform across the wavefront (like a memory pointer) at compile-time. SGPRs are manipulated by the SALU and they can only be used for Interger and Logical operations.
+
+The Local Data Share (LDS) is a on-CU software managed data share that can be used to efficiently share data between all threads in a block.
+
+<img src="img/gcn_compute_unit.png" width="600px"  class="img-center">
+<p style="text-align:center">
+Figure 1: Schematic representation of a CU in the CDNA2 architecture
+</p>
+
 Ideally, we would like to have as much occupancy as possible, all the time. In reality, occupancy is limited by hardware design choices and resource limitations dictated by the kernel (HIP, OpenCL, etc.) running on the card.
 For example, each CU of the AMD CDNA2 cards has four sets of wavefront buffers, one wavefront buffer per Execution Unit (EU), with four EUs per CU. Each EU can manage at the most **eight** wavefronts. This means that the physical limit to occupancy in CDNA2 is 32 wavefronts per CU.
 
