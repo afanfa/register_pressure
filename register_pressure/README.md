@@ -1,4 +1,4 @@
-# Register Pressure in AMD GPUs #
+# Register Pressure in AMD CDNA2 Accelerators #
 
 The following blog post is focused on a practical demo showing how to apply the recommendations explained in the following [talk](https://vimeo.com/742349001) presented as an
 OLCF training talk on August 23rd 2022. Here is a [link](https://docs.olcf.ornl.gov/training/training_archive.html) to the training archive where you can also find the slides
@@ -19,12 +19,12 @@ In AMD GPUs, a high number of concurrent wavefronts running on the same Compute 
 
 The term *occupancy* represents the maximum number of wavefronts that can potentially run on the same CU at the same time. In general, having higher occupancy helps achieve better performance by hiding costly memory accesses with other operations, but this is not always the case.
 
-In Figure 1 we show a schematic representation of a CU in the CDNA2 architecture. The Vector General Purpose Registers (VGPRs) are used to store data that is not uniform across the wavefront (different for each thread in the wavefront).
+In Figure 1 we show a schematic representation of a CU in the CDNA2 architecture. The Vector General Purpose Registers (VGPRs) are used to store data that is not uniform across the wavefront (different for each work item in the wavefront).
 They are the most general purpose registers available in the CU and they are directly manipulated by the Vector ALU (VALU). The VALU is responsible for executing most of the work in the CU, including floating-point operations (FLOPs), loads from memory, integer and logical operations, etc.
 
-The Scalar General Purpose Registers (SGPRs) represent a set of registers used to store data that is known to be uniform across the wavefront (like a memory pointer) at compile-time. SGPRs are manipulated by the SALU and they can only be used for Interger and Logical operations.
+The Scalar General Purpose Registers (SGPRs) represent a set of registers used to store data that is known to be uniform across the wavefront (like a memory pointer) at compile-time. SGPRs are manipulated by the SALU and they can only be used for a limited set of operations, like integer and logical.
 
-The Local Data Share (LDS) is a on-CU software managed data share that can be used to efficiently share data between all threads in a block.
+The Local Data Share (LDS) is a fast on-CU software managed memory that can be used to efficiently share data between all work items in a block.
 
 <img src="img/gcn_compute_unit.png" width="600px"  class="img-center">
 <p style="text-align:center">
@@ -32,7 +32,7 @@ Figure 1: Schematic representation of a CU in the CDNA2 architecture
 </p>
 
 Ideally, we would like to have as much occupancy as possible, all the time. In reality, occupancy is limited by hardware design choices and resource limitations dictated by the kernel (HIP, OpenCL, etc.) running on the card.
-For example, each CU of the AMD CDNA2 cards has four sets of wavefront buffers, one wavefront buffer per Execution Unit (EU), with four EUs per CU. Each EU can manage at the most **eight** wavefronts. This means that the physical limit to occupancy in CDNA2 is 32 wavefronts per CU.
+For example, each CU of the AMD CDNA2 cards has four sets of wavefront buffers, one wavefront buffer per Execution Unit (EU, also called SIMD Unit in Figure 1), with four EUs per CU. Each EU can manage at the most **eight** wavefronts. This means that the physical limit to occupancy in CDNA2 is 32 wavefronts per CU.
 
 The number of registers needed by a kernel is one of the most common occupancy limiters (another common limiter is LDS).
 The following table summarizes the maximum level of occupancy achievable on CDNA2 cards as a function of the number of VGPRs used by a kernel.
@@ -455,3 +455,9 @@ lbm_2_restrict.cpp:16:1: remark:     SGPRs Spill: 0 [-Rpass-analysis=kernel-reso
 lbm_2_restrict.cpp:16:1: remark:     VGPRs Spill: 0 [-Rpass-analysis=kernel-resource-usage]
 lbm_2_restrict.cpp:16:1: remark:     LDS Size [bytes/block]: 0 [-Rpass-analysis=kernel-resource-usage]
 ```
+
+## Conclusion ##
+
+In this post we describe at high level the nature and consequences of register pressure for HPC applications related to the CDNA2 architecture. We also provide a set of rules that have been found effective in reducing register pressure and increasing occupancy.
+It is important to highlight that the results shown in this blog post can be entirely replicated only on CDNA2 cards when ROCm 5.4 is used. The ever changing nature of the compiler and its heuristics may alter the outcome of the code examples shown in this post when a ROCm version different from 5.4 is used.
+We encourage readers to experiment with the code examples and evaluate performance with each change against different ROCm versions.
